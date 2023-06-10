@@ -14,8 +14,8 @@ def test_connected_partitions():
 
 def test_cumulant_propagation():
     np.random.seed(0)
-    for n in range(2, 10, 2):
+    for n in range(1, 9):
         mat = np.random.randn(n, n)
         covariance = mat @ mat.transpose()
-        result = cumulant_propagation(covariance, order=4)
+        result = cumulant_propagation(covariance)
         assert np.isclose(result, hafnian(covariance))

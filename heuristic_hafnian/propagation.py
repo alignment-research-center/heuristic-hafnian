@@ -50,10 +50,9 @@ def balanced_btree(items):
     return (balanced_btree(items[:mid]), balanced_btree(items[mid:]))
 
 
-def cumulant_propagation(covariance, order=2, btree=None):
+def cumulant_propagation(covariance, order=None, btree=None):
     assert covariance.ndim == 2
     assert covariance.shape[0] == covariance.shape[1]
-    assert order >= 2
 
     if btree is None:
         indices = np.arange(covariance.shape[0])
@@ -74,7 +73,7 @@ def cumulant_propagation(covariance, order=2, btree=None):
 
         result = 0
         for partition in connected_partitions(pairs, singles):
-            if any(len(part) > order for part in partition):
+            if order is not None and any(len(part) > order for part in partition):
                 continue
             result += np.prod([cumulant(*sorted(part, key=hash)) for part in partition])
         return result
