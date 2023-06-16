@@ -27,7 +27,7 @@ def test_cumulant_propagation():
 
 
 def test_extended_covariance_propagation():
-    np.random.seed(1)
+    np.random.seed(0)
     for n in range(2, 13, 2):
         mat = np.random.randn(n, n)
         covariance = mat @ mat.transpose()

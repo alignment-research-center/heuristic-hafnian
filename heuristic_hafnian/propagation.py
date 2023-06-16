@@ -58,6 +58,7 @@ def flatten_btree(btree):
 
 
 def btree_levels(btree):
+    btree = (btree,)
     yield btree
     while any(isinstance(subtree, Iterable) for subtree in btree):
         btree = tuple(
@@ -152,13 +153,25 @@ def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
     n = covariance.shape[0] // 2
     if btree is None:
         btree = balanced_btree(range(covariance.shape[0]))
-    levels = {ht: lvl for ht, lvl in enumerate(reversed(list(btree_levels(btree))))}
+
+    levels = {}
+    heights = {}
+    for height, level in enumerate(reversed(list(btree_levels(btree)))):
+        levels[height] = level
+        for var in level:
+            heights[var] = height
 
     @functools.cache
     def cumulant(*variables):
+        var_heights = [heights[var] for var in variables]
+        max_height = max(var_heights)
         pairs, singles = [], []
-        for variable in variables:
-            (pairs if isinstance(variable, Iterable) else singles).append(variable)
+        for variable, height in zip(variables, var_heights):
+            (
+                pairs
+                if isinstance(variable, Iterable) and height == max_height
+                else singles
+            ).append(variable)
 
         if len(pairs) == 0:
             if len(singles) == 2:
@@ -167,53 +180,50 @@ def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
                 return 0
 
         if len(pairs) == 2 and len(singles) == 0:
-            [level_height0] = [ht for ht, lvl in levels.items() if pairs[0] in lvl]
-            [level_height1] = [ht for ht, lvl in levels.items() if pairs[1] in lvl]
-            if level_height0 == level_height1:
-                left_pairs = [p for p in pairs if all(i < n for i in flatten_btree(p))]
-                right_pairs = [
-                    p for p in pairs if all(i >= n for i in flatten_btree(p))
-                ]
-                if len(left_pairs) == 1 and len(right_pairs) == 1:
-                    [left_pair] = left_pairs
-                    [right_pair] = right_pairs
-                    left_vars = [
-                        var
-                        for ht, lvl in levels.items()
-                        for var in lvl
-                        if (
-                            ht < level_height0
-                            or ht == level_height0
-                            and not isinstance(var, Iterable)
-                        )
-                        and all(i < n for i in flatten_btree(var))
-                    ]
-                    right_vars = [
-                        var
-                        for ht, lvl in levels.items()
-                        for var in lvl
-                        if (
-                            ht < level_height0
-                            or ht == level_height0
-                            and not isinstance(var, Iterable)
-                        )
-                        and all(i >= n for i in flatten_btree(var))
-                    ]
-                    # left_vars = list(range(n))
-                    # right_vars = list(range(n, 2 * n))
-                    left_cov = np.array(
-                        [cumulant(left_pair, right_var) for right_var in right_vars]
-                    )[None]
-                    right_cov = np.array(
-                        [cumulant(right_pair, left_var) for left_var in left_vars]
-                    )[:, None]
-                    mid_cov = np.array(
-                        [
-                            [cumulant(left_var, right_var) for right_var in right_vars]
-                            for left_var in left_vars
-                        ]
+            [level_height] = [ht for ht, lvl in levels.items() if pairs[0] in lvl]
+            left_pairs = [p for p in pairs if all(i < n for i in flatten_btree(p))]
+            right_pairs = [p for p in pairs if all(i >= n for i in flatten_btree(p))]
+            if len(left_pairs) == 1 and len(right_pairs) == 1:
+                [left_pair] = left_pairs
+                [right_pair] = right_pairs
+                left_vars = [
+                    var
+                    for ht, lvl in levels.items()
+                    for var in lvl
+                    if (
+                        ht < level_height
+                        or ht == level_height
+                        and not isinstance(var, Iterable)
                     )
-                    return (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
+                    and all(i < n for i in flatten_btree(var))
+                ]
+                right_vars = [
+                    var
+                    for ht, lvl in levels.items()
+                    for var in lvl
+                    if (
+                        ht < level_height
+                        or ht == level_height
+                        and not isinstance(var, Iterable)
+                    )
+                    and all(i >= n for i in flatten_btree(var))
+                ]
+                # Using these variables instead should make the algorithm the same as v1
+                # left_vars = list(range(n))
+                # right_vars = list(range(n, 2 * n))
+                left_cov = np.array(
+                    [cumulant(left_pair, right_var) for right_var in right_vars]
+                )[None]
+                right_cov = np.array(
+                    [cumulant(right_pair, left_var) for left_var in left_vars]
+                )[:, None]
+                mid_cov = np.array(
+                    [
+                        [cumulant(left_var, right_var) for right_var in right_vars]
+                        for left_var in left_vars
+                    ]
+                )
+                return (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
 
         result = 0
         for partition in connected_partitions(pairs, singles):
