@@ -70,6 +70,48 @@ def btree_levels(btree):
         yield btree
 
 
+def btree_heights(btree):
+    heights = {}
+    for height, level in enumerate(reversed(list(btree_levels(btree)))):
+        for subtree in level:
+            heights[subtree] = height
+    return heights
+
+
+def pairs_and_singles(variables, heights):
+    max_height = max(heights[variable] for variable in variables)
+
+    pairs = []
+    singles = []
+    for variable in variables:
+        if isinstance(variable, Iterable) and heights[variable] == max_height:
+            pairs.append(variable)
+        else:
+            singles.append(variable)
+
+    return pairs, singles
+
+
+def input_cumulant(singles, covariance):
+    if len(singles) == 2:
+        return covariance[singles[0], singles[1]]
+    else:
+        return 0
+
+
+def sum_over_partitions(pairs, singles, cumulant_fn):
+    result = 0
+    for partition in connected_partitions(pairs, singles):
+        term = 1
+        for part in sorted(partition, key=len):
+            factor = cumulant_fn(tuple(sorted(part, key=hash)))
+            term *= factor
+            if factor == 0:
+                break
+        result += term
+    return result
+
+
 def preprocess_covariance(covariance, *, randomize):
     assert covariance.ndim == 2
     assert covariance.shape[0] == covariance.shape[1]
@@ -85,65 +127,73 @@ def cumulant_propagation(covariance, order=None, btree=None, randomize=False):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     if btree is None:
         btree = balanced_btree(range(covariance.shape[0]))
+    heights = btree_heights(btree)
 
     @functools.cache
-    def cumulant(*variables):
-        pairs, singles = [], []
-        for variable in variables:
-            (pairs if isinstance(variable, Iterable) else singles).append(variable)
-
+    def cumulant_fn(variables):
+        if order is not None and len(variables) > order:
+            return 0
+        pairs, singles = pairs_and_singles(variables, heights)
         if len(pairs) == 0:
-            if len(singles) == 2:
-                return covariance[singles[0], singles[1]]
-            else:
-                return 0
+            return input_cumulant(singles, covariance)
+        return sum_over_partitions(pairs, singles, cumulant_fn)
 
-        result = 0
-        for partition in connected_partitions(pairs, singles):
-            if order is not None and any(len(part) > order for part in partition):
-                continue
-            result += np.prod([cumulant(*sorted(part, key=hash)) for part in partition])
-        return result
-
-    return cumulant(btree)
+    return cumulant_fn((btree,))
 
 
-def covariance_propagation(covariance, btree=None, randomize=False):
-    return cumulant_propagation(covariance, order=2, btree=btree, randomize=randomize)
-
-
-def extended_covariance_propagation_v1(covariance, btree=None, randomize=False):
+def extended_covariance_propagation_v1(
+    covariance, btree=None, randomize=False, exponents=(1,)
+):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     assert covariance.shape[0] % 2 == 0
     n = covariance.shape[0] // 2
-    order = 3
     if btree is None:
         btree = balanced_btree(range(covariance.shape[0]))
+    heights = btree_heights(btree)
 
     @functools.cache
-    def cumulant(*variables):
-        pairs, singles = [], []
-        for variable in variables:
-            (pairs if isinstance(variable, Iterable) else singles).append(variable)
-
+    def cumulant_fn(variables, order):
+        if order is not None and len(variables) > order:
+            return 0
+        pairs, singles = pairs_and_singles(variables, heights)
         if len(pairs) == 0:
-            if len(singles) == 2:
-                return covariance[singles[0], singles[1]]
-            else:
-                return 0
+            return input_cumulant(singles, covariance)
+        return sum_over_partitions(
+            pairs, singles, lambda variables: cumulant_fn(variables, order)
+        )
 
-        result = 0
-        for partition in connected_partitions(pairs, singles):
-            if order is not None and any(len(part) > order for part in partition):
-                continue
-            result += np.prod([cumulant(*sorted(part, key=hash)) for part in partition])
-        return result
-
-    left_ev = cumulant(btree[0])
-    right_ev = cumulant(btree[1])
-    left_cov = np.array([cumulant((btree[0], i)) for i in range(n, 2 * n)])[None]
-    right_cov = np.array([cumulant((i, btree[1])) for i in range(n)])[:, None]
-    cov = (left_cov @ np.linalg.pinv(covariance[:n, n:]) @ right_cov)[0, 0]
+    left_ev = cumulant_fn((btree[0],), order=3)
+    right_ev = cumulant_fn((btree[1],), order=3)
+    left_vars = []
+    right_vars = []
+    if 1 in exponents:
+        left_vars += list(range(n))
+        right_vars += list(range(n, 2 * n))
+    if 2 in exponents:
+        pairs = [
+            var
+            for var in heights.keys()
+            if isinstance(var, Iterable)
+            and all(not isinstance(subvar, Iterable) for subvar in var)
+        ]
+        left_vars += [p for p in pairs if all(i < n for i in flatten_btree(p))]
+        right_vars += [p for p in pairs if all(i >= n for i in flatten_btree(p))]
+    left_cov = np.array([cumulant_fn((btree[0], var), order=3) for var in right_vars])[
+        None
+    ]
+    right_cov = np.array([cumulant_fn((var, btree[1]), order=3) for var in left_vars])[
+        :, None
+    ]
+    mid_cov = np.array(
+        [
+            [cumulant_fn((left_var, right_var), order=None) for right_var in right_vars]
+            for left_var in left_vars
+        ]
+    )
+    if n == 1:
+        cov = 0
+    else:
+        cov = (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
     return left_ev * right_ev + cov
 
 
