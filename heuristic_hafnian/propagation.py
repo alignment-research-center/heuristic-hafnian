@@ -142,7 +142,12 @@ def cumulant_propagation(covariance, order=None, btree=None, randomize=False):
 
 
 def extended_covariance_propagation_v1(
-    covariance, btree=None, randomize=False, exponents=(1,)
+    covariance,
+    btree=None,
+    randomize=False,
+    exponents=(1,),
+    order=3,
+    order_mid=None,
 ):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     assert covariance.shape[0] % 2 == 0
@@ -162,35 +167,37 @@ def extended_covariance_propagation_v1(
             pairs, singles, lambda variables: cumulant_fn(variables, order)
         )
 
-    left_ev = cumulant_fn((btree[0],), order=3)
-    right_ev = cumulant_fn((btree[1],), order=3)
+    left_ev = cumulant_fn((btree[0],), order=order)
+    right_ev = cumulant_fn((btree[1],), order=order)
     left_vars = []
     right_vars = []
     if 1 in exponents:
         left_vars += list(range(n))
         right_vars += list(range(n, 2 * n))
     if 2 in exponents:
-        pairs = [
-            var
-            for var in heights.keys()
-            if isinstance(var, Iterable)
-            and all(not isinstance(subvar, Iterable) for subvar in var)
+        left_vars += [(i, j) for i, j in itertools.product(*(range(n),) * 2) if i < j]
+        right_vars += [
+            (i, j) for i, j in itertools.product(*(range(n, 2 * n),) * 2) if i < j
         ]
-        left_vars += [p for p in pairs if all(i < n for i in flatten_btree(p))]
-        right_vars += [p for p in pairs if all(i >= n for i in flatten_btree(p))]
-    left_cov = np.array([cumulant_fn((btree[0], var), order=3) for var in right_vars])[
-        None
-    ]
-    right_cov = np.array([cumulant_fn((var, btree[1]), order=3) for var in left_vars])[
-        :, None
-    ]
+    # This ensures linearity but is a bit of a hack
+    for var in left_vars + right_vars:
+        heights[var] = 1 if isinstance(var, Iterable) else 0
+    left_cov = np.array(
+        [cumulant_fn((btree[0], var), order=order) for var in right_vars]
+    )[None]
+    right_cov = np.array(
+        [cumulant_fn((var, btree[1]), order=order) for var in left_vars]
+    )[:, None]
     mid_cov = np.array(
         [
-            [cumulant_fn((left_var, right_var), order=None) for right_var in right_vars]
+            [
+                cumulant_fn((left_var, right_var), order=order_mid)
+                for right_var in right_vars
+            ]
             for left_var in left_vars
         ]
     )
-    if n == 1:
+    if mid_cov.size == 0:
         cov = 0
     else:
         cov = (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
