@@ -50,6 +50,12 @@ def balanced_btree(items):
     return (balanced_btree(items[:mid]), balanced_btree(items[mid:]))
 
 
+def unbalanced_btree(items):
+    if len(items) == 1:
+        return items[0]
+    return (unbalanced_btree(items[:1]), unbalanced_btree(items[1:]))
+
+
 def flatten_btree(btree):
     if isinstance(btree, Iterable):
         return tuple(item for subtree in btree for item in flatten_btree(subtree))
@@ -79,12 +85,17 @@ def btree_heights(btree):
 
 
 def pairs_and_singles(variables, heights):
-    max_height = max(heights[variable] for variable in variables)
+    pair_heights = []
+    for variable in variables:
+        if isinstance(variable, Iterable):
+            pair_heights.append(heights[variable])
+    if pair_heights:
+        max_pair_height = max(pair_heights)
 
     pairs = []
     singles = []
     for variable in variables:
-        if isinstance(variable, Iterable) and heights[variable] == max_height:
+        if isinstance(variable, Iterable) and heights[variable] == max_pair_height:
             pairs.append(variable)
         else:
             singles.append(variable)
@@ -141,6 +152,10 @@ def cumulant_propagation(covariance, order=None, btree=None, randomize=False):
     return cumulant_fn((btree,))
 
 
+def covariance_propagation(covariance, btree=None, randomize=False):
+    return cumulant_propagation(covariance, order=2, btree=btree, randomize=randomize)
+
+
 def extended_covariance_propagation_v1(
     covariance,
     btree=None,
@@ -169,19 +184,30 @@ def extended_covariance_propagation_v1(
 
     left_ev = cumulant_fn((btree[0],), order=order)
     right_ev = cumulant_fn((btree[1],), order=order)
-    left_vars = []
-    right_vars = []
-    if 1 in exponents:
-        left_vars += list(range(n))
-        right_vars += list(range(n, 2 * n))
-    if 2 in exponents:
-        left_vars += [(i, j) for i, j in itertools.product(*(range(n),) * 2) if i < j]
-        right_vars += [
-            (i, j) for i, j in itertools.product(*(range(n, 2 * n),) * 2) if i < j
-        ]
+    left_vars = {
+        1: list(range(n)),
+        2: [(i, j) for i, j in itertools.product(*(range(n),) * 2) if i < j],
+        3: [
+            (i, (j, k))
+            for i, j, k in itertools.product(*(range(n),) * 3)
+            if i < j and j < k
+        ],
+    }
+    right_vars = {
+        1: list(range(n, 2 * n)),
+        2: [(i, j) for i, j in itertools.product(*(range(n, 2 * n),) * 2) if i < j],
+        3: [
+            (i, (j, k))
+            for i, j, k in itertools.product(*(range(n, 2 * n),) * 3)
+            if i < j and j < k
+        ],
+    }
     # This ensures linearity but is a bit of a hack
-    for var in left_vars + right_vars:
-        heights[var] = 1 if isinstance(var, Iterable) else 0
+    for exponent in left_vars.keys():
+        for var in left_vars[exponent] + right_vars[exponent]:
+            heights[var] = exponent - 1
+    left_vars = [var for exponent in exponents for var in left_vars[exponent]]
+    right_vars = [var for exponent in exponents for var in right_vars[exponent]]
     left_cov = np.array(
         [cumulant_fn((btree[0], var), order=order) for var in right_vars]
     )[None]
@@ -281,6 +307,7 @@ def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
                     ]
                 )
                 return (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
+                # + cumulant(left_pair[0], right_pair[0]) * cumulant(left_pair[1], right_pair[1]) + cumulant(left_pair[0], right_pair[1]) * cumulant(left_pair[1], right_pair[0])
 
         result = 0
         for partition in connected_partitions(pairs, singles):
