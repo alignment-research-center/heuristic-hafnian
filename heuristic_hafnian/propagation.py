@@ -156,7 +156,7 @@ def covariance_propagation(covariance, btree=None, randomize=False):
     return cumulant_propagation(covariance, order=2, btree=btree, randomize=randomize)
 
 
-def extended_covariance_propagation_v1(
+def extended_covariance_propagation(
     covariance,
     btree=None,
     randomize=False,
@@ -230,7 +230,7 @@ def extended_covariance_propagation_v1(
     return left_ev * right_ev + cov
 
 
-def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
+def extended_third_cumulant_propagation(covariance, btree=None, randomize=False):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     assert covariance.shape[0] % 2 == 0
     n = covariance.shape[0] // 2
@@ -291,9 +291,7 @@ def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
                     )
                     and all(i >= n for i in flatten_btree(var))
                 ]
-                # Using these variables instead should make the algorithm the same as v1
-                # left_vars = list(range(n))
-                # right_vars = list(range(n, 2 * n))
+                left_vars = right_vars = left_vars + right_vars
                 left_cov = np.array(
                     [cumulant(left_pair, right_var) for right_var in right_vars]
                 )[None]
@@ -306,8 +304,13 @@ def extended_covariance_propagation_v2(covariance, btree=None, randomize=False):
                         for left_var in left_vars
                     ]
                 )
-                return (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
-                # + cumulant(left_pair[0], right_pair[0]) * cumulant(left_pair[1], right_pair[1]) + cumulant(left_pair[0], right_pair[1]) * cumulant(left_pair[1], right_pair[0])
+                return (
+                    (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
+                    + cumulant(left_pair[0], right_pair[0])
+                    * cumulant(left_pair[1], right_pair[1])
+                    + cumulant(left_pair[0], right_pair[1])
+                    * cumulant(left_pair[1], right_pair[0])
+                )
 
         result = 0
         for partition in connected_partitions(pairs, singles):

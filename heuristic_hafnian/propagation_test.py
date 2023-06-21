@@ -24,13 +24,3 @@ def test_cumulant_propagation():
         covariance = mat @ mat.transpose()
         result = cumulant_propagation(covariance)
         assert np.isclose(result, hafnian(covariance))
-
-
-def test_extended_covariance_propagation():
-    np.random.seed(0)
-    for n in range(2, 13, 2):
-        mat = np.random.randn(n, n)
-        covariance = mat @ mat.transpose()
-        result_v1 = extended_covariance_propagation_v1(covariance)
-        result_v2 = extended_covariance_propagation_v2(covariance)
-        assert np.isclose(result_v1, result_v2)
