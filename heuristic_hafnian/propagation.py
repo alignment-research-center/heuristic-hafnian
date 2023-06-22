@@ -278,8 +278,6 @@ def extended_third_cumulant_propagation(covariance, btree=None, randomize=False)
             )
             and all(i >= n for i in flatten_btree(var))
         ]
-        left_vars = list(range(n))
-        right_vars = list(range(n, 2 * n))
         left_cov = np.array(
             [
                 cumulant_fn((left_pair[0], left_pair[1], right_var))
