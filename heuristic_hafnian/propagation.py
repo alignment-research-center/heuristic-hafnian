@@ -236,87 +236,70 @@ def extended_third_cumulant_propagation(covariance, btree=None, randomize=False)
     n = covariance.shape[0] // 2
     if btree is None:
         btree = balanced_btree(range(covariance.shape[0]))
-
-    levels = {}
-    heights = {}
-    for height, level in enumerate(reversed(list(btree_levels(btree)))):
-        levels[height] = level
-        for var in level:
-            heights[var] = height
+    heights = btree_heights(btree)
+    order = 3
 
     @functools.cache
-    def cumulant(*variables):
-        var_heights = [heights[var] for var in variables]
-        max_height = max(var_heights)
-        pairs, singles = [], []
-        for variable, height in zip(variables, var_heights):
-            (
-                pairs
-                if isinstance(variable, Iterable) and height == max_height
-                else singles
-            ).append(variable)
-
+    def cumulant_fn(variables):
+        if order is not None and len(variables) > order:
+            return 0
+        pairs, singles = pairs_and_singles(variables, heights)
         if len(pairs) == 0:
-            if len(singles) == 2:
-                return covariance[singles[0], singles[1]]
-            else:
-                return 0
+            return input_cumulant(singles, covariance)
+        result = sum_over_partitions(
+            pairs, singles, lambda variables: cumulant_fn(variables)
+        )
 
-        if len(pairs) == 2 and len(singles) == 0:
-            [level_height] = [ht for ht, lvl in levels.items() if pairs[0] in lvl]
-            left_pairs = [p for p in pairs if all(i < n for i in flatten_btree(p))]
-            right_pairs = [p for p in pairs if all(i >= n for i in flatten_btree(p))]
-            if len(left_pairs) == 1 and len(right_pairs) == 1:
-                [left_pair] = left_pairs
-                [right_pair] = right_pairs
-                left_vars = [
-                    var
-                    for ht, lvl in levels.items()
-                    for var in lvl
-                    if (
-                        ht < level_height
-                        or ht == level_height
-                        and not isinstance(var, Iterable)
-                    )
-                    and all(i < n for i in flatten_btree(var))
-                ]
-                right_vars = [
-                    var
-                    for ht, lvl in levels.items()
-                    for var in lvl
-                    if (
-                        ht < level_height
-                        or ht == level_height
-                        and not isinstance(var, Iterable)
-                    )
-                    and all(i >= n for i in flatten_btree(var))
-                ]
-                left_vars = right_vars = left_vars + right_vars
-                left_cov = np.array(
-                    [cumulant(left_pair, right_var) for right_var in right_vars]
-                )[None]
-                right_cov = np.array(
-                    [cumulant(right_pair, left_var) for left_var in left_vars]
-                )[:, None]
-                mid_cov = np.array(
-                    [
-                        [cumulant(left_var, right_var) for right_var in right_vars]
-                        for left_var in left_vars
-                    ]
-                )
-                return (
-                    (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
-                    + cumulant(left_pair[0], right_pair[0])
-                    * cumulant(left_pair[1], right_pair[1])
-                    + cumulant(left_pair[0], right_pair[1])
-                    * cumulant(left_pair[1], right_pair[0])
-                )
+        if not (len(pairs) == 2 and len(singles) == 0):
+            return result
 
-        result = 0
-        for partition in connected_partitions(pairs, singles):
-            if any(len(part) > 3 for part in partition):
-                continue
-            result += np.prod([cumulant(*sorted(part, key=hash)) for part in partition])
+        left_pairs = [p for p in pairs if all(i < n for i in flatten_btree(p))]
+        right_pairs = [p for p in pairs if all(i >= n for i in flatten_btree(p))]
+        if not (len(left_pairs) == 1 and len(right_pairs) == 1):
+            return result
+        [left_pair] = left_pairs
+        [right_pair] = right_pairs
+
+        left_vars = [
+            var
+            for var, ht in heights.items()
+            if (
+                ht < heights[left_pair]
+                or (ht == heights[left_pair] and (not isinstance(var, Iterable)))
+            )
+            and all(i < n for i in flatten_btree(var))
+        ]
+        right_vars = [
+            var
+            for var, ht in heights.items()
+            if (
+                ht < heights[right_pair]
+                or (ht == heights[right_pair] and (not isinstance(var, Iterable)))
+            )
+            and all(i >= n for i in flatten_btree(var))
+        ]
+        left_vars = list(range(n))
+        right_vars = list(range(n, 2 * n))
+        left_cov = np.array(
+            [
+                cumulant_fn((left_pair[0], left_pair[1], right_var))
+                for right_var in right_vars
+            ]
+        )[None]
+        right_cov = np.array(
+            [
+                cumulant_fn((right_pair[0], right_pair[1], left_var))
+                for left_var in left_vars
+            ]
+        )[:, None]
+        mid_cov = np.array(
+            [
+                [cumulant_fn((left_var, right_var)) for right_var in right_vars]
+                for left_var in left_vars
+            ]
+        )
+        result += (left_cov @ np.linalg.pinv(mid_cov) @ right_cov)[0, 0]
+
         return result
 
-    return cumulant(btree)
+    return cumulant_fn((btree,))

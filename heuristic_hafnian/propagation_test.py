@@ -1,12 +1,7 @@
 import numpy as np
 from thewalrus.reference import hafnian
 
-from .propagation import (
-    connected_partitions,
-    cumulant_propagation,
-    extended_covariance_propagation_v1,
-    extended_covariance_propagation_v2,
-)
+from .propagation import connected_partitions, cumulant_propagation
 
 
 def test_connected_partitions():
