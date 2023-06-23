@@ -38,7 +38,10 @@ def btree_heights(btree):
     heights = {}
     for height, level in enumerate(reversed(list(btree_levels(btree)))):
         for subtree in level:
-            heights[subtree] = height
+            if isinstance(subtree, Iterable):
+                heights[subtree] = height
+            else:
+                heights[subtree] = 0
     return heights
 
 

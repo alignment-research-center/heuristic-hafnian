@@ -46,17 +46,12 @@ def connected_partitions(pairs, singles=None):
 
 
 def pairs_and_singles(variables, heights):
-    pair_heights = []
-    for variable in variables:
-        if isinstance(variable, Iterable):
-            pair_heights.append(heights[variable])
-    if pair_heights:
-        max_pair_height = max(pair_heights)
+    max_height = max([heights[var] for var in variables])
 
     pairs = []
     singles = []
     for variable in variables:
-        if isinstance(variable, Iterable) and heights[variable] == max_pair_height:
+        if isinstance(variable, Iterable) and heights[variable] == max_height:
             pairs.append(variable)
         else:
             singles.append(variable)
@@ -95,7 +90,9 @@ def preprocess_covariance(covariance, *, randomize):
     return covariance
 
 
-def cumulant_propagation(covariance, order=None, btree=None, randomize=False):
+def cumulant_propagation(
+    covariance, order=None, btree=None, variables=None, randomize=False
+):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     if btree is None:
         btree = balanced_btree(range(covariance.shape[0]))
@@ -110,7 +107,9 @@ def cumulant_propagation(covariance, order=None, btree=None, randomize=False):
             return input_cumulant(singles, covariance)
         return sum_over_partitions(pairs, singles, cumulant_fn)
 
-    return cumulant_fn((btree,))
+    if variables is None:
+        variables = (btree,)
+    return cumulant_fn(variables)
 
 
 def impute(variables, max_height, sides, cumulant_fn, inv_cov_fn):
@@ -129,7 +128,7 @@ def impute(variables, max_height, sides, cumulant_fn, inv_cov_fn):
 
 
 def cumulant_propagation_with_imputation(
-    covariance, order=None, btree=None, randomize=False
+    covariance, order=None, btree=None, variables=None, randomize=False
 ):
     covariance = preprocess_covariance(covariance, randomize=randomize)
     if btree is None:
@@ -140,14 +139,10 @@ def cumulant_propagation_with_imputation(
     @functools.cache
     def inv_cov_fn(max_height):
         left_vars = [
-            var
-            for var, ht in heights.items()
-            if (ht <= max_height or not isinstance(var, Iterable)) and sides[var] == 0
+            var for var, ht in heights.items() if ht <= max_height and sides[var] == 0
         ]
         right_vars = [
-            var
-            for var, ht in heights.items()
-            if (ht <= max_height or not isinstance(var, Iterable)) and sides[var] == 1
+            var for var, ht in heights.items() if ht <= max_height and sides[var] == 1
         ]
         cov = np.array(
             [
@@ -169,4 +164,6 @@ def cumulant_propagation_with_imputation(
             pairs, singles, lambda variables: cumulant_fn(variables)
         )
 
-    return cumulant_fn((btree,))
+    if variables is None:
+        variables = (btree,)
+    return cumulant_fn(variables)
