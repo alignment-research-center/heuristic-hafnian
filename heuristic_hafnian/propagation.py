@@ -160,9 +160,7 @@ def cumulant_propagation_with_imputation(
         if order is not None and len(variables) > order:
             max_height = max([heights[var] for var in variables])
             return impute(variables, max_height, sides, cumulant_fn, inv_cov_fn)
-        return sum_over_partitions(
-            pairs, singles, lambda variables: cumulant_fn(variables)
-        )
+        return sum_over_partitions(pairs, singles, cumulant_fn)
 
     if variables is None:
         variables = (btree,)

@@ -15,10 +15,9 @@ def unbalanced_btree(items):
 
 
 def flatten_btree(btree):
-    if isinstance(btree, Iterable):
-        return tuple(item for subtree in btree for item in flatten_btree(subtree))
-    else:
+    if not isinstance(btree, Iterable):
         return (btree,)
+    return tuple(item for subtree in btree for item in flatten_btree(subtree))
 
 
 def btree_levels(btree):
