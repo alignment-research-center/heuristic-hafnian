@@ -60,9 +60,10 @@ def random_complex_double_wishart(p, *, cov=None, rel=None, dof=None):
     B is complex symmetric and A is Hermitian positive semi-definite.
 
     The distribution is analogous to a complex Wishart matrix, except
-    instead of representing a complex normal covariance matrix, it
-    represents ((rel cov) (cov* rel*)) for the covariance matrix cov
-    and relation matrix rel of a complex normal distribution.
+    instead of being a sample covariance matrix of a complex normal
+    distribution, it is a sample block matrix ((rel cov) (cov* rel*))
+    where cov is the covariance matrix and rel is the relation matrix
+    of a complex normal distribution.
     """
     assert p % 2 == 0
     if cov is None:
@@ -84,7 +85,7 @@ def random_complex_double_wishart(p, *, cov=None, rel=None, dof=None):
     samples = real_samples[:, : p // 2] + real_samples[:, p // 2 :] * 1j
     psd = samples.transpose() @ samples.conjugate()
     sym = samples.transpose() @ samples
-    return np.block([[sym, psd], [psd, sym]])
+    return np.block([[sym, psd], [psd.conjugate(), sym.conjugate()]])
 
 
 def random_double_wishart(p, *, cov=None, dof=None):
