@@ -39,6 +39,7 @@ def test_random_complex_double_wishart():
     dof = 1000
     for p in range(2, 20, 2):
         mat = random_complex_double_wishart(p)
+        assert np.isclose(mat, mat.transpose()).all()
         assert np.isclose(
             mat[: p // 2, : p // 2], mat[p // 2 :, p // 2 :].conjugate()
         ).all()
@@ -67,6 +68,7 @@ def test_random_double_wishart():
     dof = 1000
     for p in range(2, 20, 2):
         mat = random_double_wishart(p)
+        assert np.isclose(mat, mat.transpose()).all()
         assert np.isclose(mat[: p // 2, : p // 2], mat[p // 2 :, p // 2 :]).all()
         assert np.isclose(mat[: p // 2, p // 2 :], mat[p // 2 :, : p // 2]).all()
         cov = mat[: p // 2, p // 2 :]

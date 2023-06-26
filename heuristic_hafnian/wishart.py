@@ -11,6 +11,18 @@ def random_symmetric(p):
     return mat
 
 
+def random_complex_symmetric(p):
+    """
+    Random complex symmetric matrix with i.i.d.
+    standard complex normal off-diagonal entries.
+    """
+    real_mat = np.random.randn(p, p)
+    imag_mat = np.random.randn(p, p)
+    mat = real_mat + imag_mat * 1j
+    mat = (mat + mat.transpose()) / 2
+    return mat
+
+
 def random_hermitian(p):
     """
     Random Hermitian matrix with i.i.d.
@@ -18,8 +30,8 @@ def random_hermitian(p):
     """
     real_mat = np.random.randn(p, p)
     imag_mat = np.random.randn(p, p)
-    mat = (real_mat + imag_mat * 1j) / 2
-    mat = (mat + mat.conjugate().transpose()) / 2**0.5
+    mat = real_mat + imag_mat * 1j
+    mat = (mat + mat.conjugate().transpose()) / 2
     return mat
 
 
