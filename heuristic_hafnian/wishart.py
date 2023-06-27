@@ -66,10 +66,21 @@ def random_complex_wishart(p, *, cov=None, dof=None):
     return samples.transpose() @ samples.conjugate()
 
 
+def zero_block_diag(mat):
+    """
+    Returns the block matrix ((0 mat) (mat^T 0)),
+    whose hafnian is the permanent of mat.
+    """
+    return np.block(
+        [[np.zeros(mat.shape), mat], [mat.transpose(), np.zeros(mat.shape)]]
+    )
+
+
 def random_complex_double_wishart(p, *, cov=None, rel=None, dof=None):
     """
     Random p x p block matrix of the form ((B A) (A* B*)) where
     B is complex symmetric and A is Hermitian positive semi-definite.
+    Any matrix of this form has non-negative hafnian.
 
     The distribution is analogous to a complex Wishart matrix, except
     instead of being a sample covariance matrix of a complex normal
@@ -104,6 +115,7 @@ def random_double_wishart(p, *, cov=None, dof=None):
     """
     Random p x p block matrix of the form ((B A) (A B)) where
     B is real symmetric and A is real symmetric positive semi-definite.
+    Any matrix of this form has non-negative hafnian.
 
     Equivalent to taking the real part of a complex double Wishart
     with relation matrix zero.

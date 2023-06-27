@@ -20,7 +20,7 @@ def explained_variance(
     for _ in tqdm(range(n_tries), disable=not progress_bar):
         covariance = sampler(n)
         estimates.append(estimator(covariance, **estimator_kwargs))
-        exacts.append(hafnian(covariance))
+        exacts.append(hafnian(covariance, method="recursive"))
     estimates = np.array(estimates)
     exacts = np.array(exacts)
     ev = 1 - (np.abs(exacts - estimates) ** 2).mean() / exacts.var()

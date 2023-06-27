@@ -2,6 +2,10 @@ import numpy as np
 
 
 def all_pairings(items):
+    """
+    Yields all pairings (i.e., partitions in which each part
+    has size 2) of the given items.
+    """
     items = list(items)
     if len(items) == 0:
         yield []
@@ -15,6 +19,10 @@ def all_pairings(items):
 
 
 def random_pairing(items):
+    """
+    Returns a uniformly random pairing (i.e., partition in which
+    each part has size 2) of the given items.
+    """
     items = list(items)
     assert len(items) % 2 == 0
     if len(items) == 0:
@@ -28,6 +36,11 @@ def random_pairing(items):
 
 
 def product_over_pairing(matrix, pairing):
+    """
+    Given a symmetric matrix, returns the contribution to the hafnian
+    for the given pairing, i.e. the product of the (i, j)th entries
+    of the matrix for each (i, j) in the pairing.
+    """
     items = sorted([item for pair in pairing for item in pair])
     n = len(items)
     offset = items[0]
@@ -42,6 +55,10 @@ def product_over_pairing(matrix, pairing):
 
 
 def elementary_matrix(pairing):
+    """
+    Given a pairing, returns the symmetric matrix with whose (i, j)th
+    entry is 1 if (i, j) or (j, i) is in the pairing and 0 otherwise.
+    """
     items = sorted([item for pair in pairing for item in pair])
     n = len(items)
     offset = items[0]
