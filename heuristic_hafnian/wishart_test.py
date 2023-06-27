@@ -1,10 +1,10 @@
 import numpy as np
 
 from .wishart import (
-    random_wishart,
-    random_complex_wishart,
     random_complex_double_wishart,
+    random_complex_wishart,
     random_double_wishart,
+    random_wishart,
 )
 
 
