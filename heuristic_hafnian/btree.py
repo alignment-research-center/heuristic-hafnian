@@ -33,20 +33,21 @@ def btree_levels(btree):
         yield btree
 
 
-def btree_heights(btree):
+def breadth_first(btree):
+    for level in btree_levels(btree):
+        for subtree in level:
+            yield subtree
+
+
+def depth_first(btree):
+    yield btree
     if not isinstance(btree, Iterable):
-        return {btree: 0}
-    heights = {}
+        return
     for subtree in btree:
-        heights = {**heights, **btree_heights(subtree)}
-    heights[btree] = max(heights.values()) + 1
-    return heights
+        yield from depth_first(subtree)
 
 
-def btree_sides(btree):
-    sides = {}
-    for side in (0, 1):
-        for level in btree_levels(btree[side]):
-            for subtree in level:
-                sides[subtree] = side
-    return sides
+def btree_height(btree):
+    if not isinstance(btree, Iterable):
+        return 0
+    return max(btree_height(subtree) for subtree in btree) + 1

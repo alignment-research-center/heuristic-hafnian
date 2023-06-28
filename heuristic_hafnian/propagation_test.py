@@ -18,4 +18,4 @@ def test_cumulant_propagation():
         mat = np.random.randn(n, n)
         covariance = mat @ mat.transpose()
         result = cumulant_propagation(covariance)
-        assert np.isclose(result, hafnian(covariance, method="recursive"))
+        assert np.isclose(result, hafnian(covariance))
