@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from .btree import balanced_btree, breadth_first, btree_height
+from .btree import balanced_btree, breadth_first, btree_height, flatten_btree
 
 
 def connected_partitions(pairs, singles=None):
@@ -98,11 +98,15 @@ def get_heights(btrees):
     return heights
 
 
-def cumulant_propagation(covariance, order=None, btrees=None, randomize=False):
+def cumulant_propagation(
+    covariance, order=None, btree=None, variables=None, randomize=False
+):
     covariance = preprocess_covariance(covariance, randomize=randomize)
-    if btrees is None:
-        btrees = (balanced_btree(range(covariance.shape[0])),)
-    heights = get_heights(btrees)
+    if btree is None:
+        btree = balanced_btree(range(covariance.shape[0]))
+    if variables is None:
+        variables = (btree,)
+    heights = get_heights((btree,) + variables)
 
     @functools.cache
     def cumulant_fn(variables):
@@ -113,20 +117,24 @@ def cumulant_propagation(covariance, order=None, btrees=None, randomize=False):
             return input_cumulant(singles, covariance)
         return sum_over_partitions(pairs, singles, cumulant_fn)
 
-    return cumulant_fn(btrees)
+    return cumulant_fn(variables)
 
 
-def get_sides(btrees):
+def get_sides(btree, variables):
+    left_inputs = flatten_btree(btree[0])
+    right_inputs = flatten_btree(btree[1])
     sides = {}
-    for i, btree in enumerate(btrees):
-        if len(btrees) % 2 == 1 and i == len(btrees) // 2:
-            for subtree in breadth_first(btree[0]):
+    for subtree in breadth_first(btree[0]):
+        sides[subtree] = 0
+    for subtree in breadth_first(btree[1]):
+        sides[subtree] = 1
+    for variable in variables:
+        for subtree in breadth_first(variable):
+            inputs = flatten_btree(subtree)
+            if all(i in left_inputs for i in inputs):
                 sides[subtree] = 0
-            for subtree in breadth_first(btree[1]):
+            elif all(i in right_inputs for i in inputs):
                 sides[subtree] = 1
-        else:
-            for subtree in breadth_first(btree):
-                sides[subtree] = 0 if i < len(btrees) // 2 else 1
     return sides
 
 
@@ -146,21 +154,27 @@ def impute(variables, max_height, sides, cumulant_fn, inv_cov_fn):
 
 
 def cumulant_propagation_with_imputation(
-    covariance, order=None, btrees=None, randomize=False
+    covariance, order=None, btree=None, variables=None, randomize=False
 ):
     covariance = preprocess_covariance(covariance, randomize=randomize)
-    if btrees is None:
-        btrees = (balanced_btree(range(covariance.shape[0])),)
-    heights = get_heights(btrees)
-    sides = get_sides(btrees)
+    if btree is None:
+        btree = balanced_btree(range(covariance.shape[0]))
+    if variables is None:
+        variables = (btree,)
+    heights = get_heights((btree,) + variables)
+    sides = get_sides(btree, variables)
 
     @functools.cache
     def inv_cov_fn(max_height):
         left_vars = [
-            var for var, ht in heights.items() if ht <= max_height and sides[var] == 0
+            var
+            for var in breadth_first(btree)
+            if heights[var] <= max_height and sides[var] == 0
         ]
         right_vars = [
-            var for var, ht in heights.items() if ht <= max_height and sides[var] == 1
+            var
+            for var in breadth_first(btree)
+            if heights[var] <= max_height and sides[var] == 1
         ]
         cov = np.array(
             [
@@ -180,4 +194,4 @@ def cumulant_propagation_with_imputation(
             return impute(variables, max_height, sides, cumulant_fn, inv_cov_fn)
         return sum_over_partitions(pairs, singles, cumulant_fn)
 
-    return cumulant_fn(btrees)
+    return cumulant_fn(variables)
