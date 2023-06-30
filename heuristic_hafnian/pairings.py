@@ -59,7 +59,7 @@ def elementary_matrix(pairing):
     Given a pairing, returns the symmetric matrix with whose (i, j)th
     entry is 1 if (i, j) or (j, i) is in the pairing and 0 otherwise.
     """
-    items = sorted([item for pair in pairing for item in pair])
+    items = sorted(set([item for pair in pairing for item in pair]))
     n = len(items)
     offset = items[0]
     assert items == list(range(offset, offset + n))
