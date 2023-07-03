@@ -195,3 +195,73 @@ def cumulant_propagation_with_imputation(
         return sum_over_partitions(pairs, singles, cumulant_fn)
 
     return cumulant_fn(variables)
+
+
+def permanent(covariance, btree=None):
+    import itertools
+
+    if btree is None:
+        btree = balanced_btree(range(covariance.shape[0]))
+
+    @functools.cache
+    def cov_fn(var1, var2):
+        height1 = btree_height(var1)
+        height2 = btree_height(var2)
+        assert height1 == height2
+
+        if height1 == 0:
+            return covariance[var1, var2]
+
+        if height1 == 1:
+            return (
+                covariance[var1[0], var2[0]] * covariance[var1[1], var2[1]]
+                + covariance[var1[0], var2[1]] * covariance[var1[1], var2[0]]
+            )
+
+        if height1 > 1:
+            result = 0
+            subvar1 = var1[0] + var1[1]
+            subvar2 = var2[0] + var2[1]
+            for perm in itertools.permutations(range(4)):
+                result -= (
+                    2
+                    * cov_fn(subvar1[0], subvar2[perm[0]])
+                    * cov_fn(subvar1[1], subvar2[perm[1]])
+                    * cov_fn(subvar1[2], subvar2[perm[2]])
+                    * cov_fn(subvar1[3], subvar2[perm[3]])
+                )
+                result += 0.25 * (
+                    (
+                        cov_fn(
+                            (subvar1[0], subvar1[1]),
+                            (subvar2[perm[0]], subvar2[perm[1]]),
+                        )
+                        * cov_fn(
+                            (subvar1[2], subvar1[3]),
+                            (subvar2[perm[2]], subvar2[perm[3]]),
+                        )
+                    )
+                    + (
+                        cov_fn(
+                            (subvar1[0], subvar1[2]),
+                            (subvar2[perm[0]], subvar2[perm[2]]),
+                        )
+                        * cov_fn(
+                            (subvar1[1], subvar1[3]),
+                            (subvar2[perm[1]], subvar2[perm[3]]),
+                        )
+                    )
+                    + (
+                        cov_fn(
+                            (subvar1[0], subvar1[3]),
+                            (subvar2[perm[0]], subvar2[perm[3]]),
+                        )
+                        * cov_fn(
+                            (subvar1[2], subvar1[1]),
+                            (subvar2[perm[2]], subvar2[perm[1]]),
+                        )
+                    )
+                )
+            return result
+
+    return cov_fn(btree, btree)
