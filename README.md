@@ -19,4 +19,4 @@ Example:
 32274.905033773324
 ```
 
-Use the `evaluation` module to calculate the explained variance of different estimators over different distributions.
+Use the `evaluation` module to calculate the explained variance and OLS regression coefficients of different estimators over different distributions.

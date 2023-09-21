@@ -1,3 +1,6 @@
+import itertools
+import warnings
+
 import numpy as np
 
 
@@ -8,6 +11,41 @@ def random_symmetric(p):
     """
     mat = np.random.randn(p, p)
     mat = (mat + mat.transpose()) / 2**0.5
+    return mat
+
+
+random_sign_symmetric_states = {}
+
+
+def random_sign_symmetric(p, *, constant_diagonal=False, without_replacement=False):
+    """
+    Random real symmetric matrix with i.i.d.
+    uniform +/-1 entries, or with ones on the
+    diagonal if constant_diagonal=True is passed.
+
+    If without_replacement=True is passed,
+    statefully returns all such matrices in
+    some order.
+    """
+    num_entries = (p * (p + (-1 if constant_diagonal else 1))) // 2
+    if without_replacement:
+        if 2**num_entries > int(1e8):
+            warnings.warn(f"Initializing state of size {2**num_entries}")
+        key = (int(p), bool(constant_diagonal))
+        state = random_sign_symmetric_states.get(key)
+        if not state:
+            state = itertools.product(*(range(2),) * num_entries)
+            state = list(map(np.array, state))
+            np.random.shuffle(state)
+            random_sign_symmetric_states[key] = state
+        vec = state.pop()
+    else:
+        vec = np.random.randint(0, 2, size=num_entries)
+    vec = (vec * 2 - 1).astype(float)
+    mat = np.ones((p, p))
+    rows, cols = np.triu_indices(p, k=(1 if constant_diagonal else 0))
+    mat[rows, cols] = vec
+    mat[cols, rows] = vec
     return mat
 
 

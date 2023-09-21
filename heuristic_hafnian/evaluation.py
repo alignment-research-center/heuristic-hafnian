@@ -13,7 +13,7 @@ def explained_variance(
     n_tries=1000,
     n_resamples=10000,
     progress_bar=True,
-    **estimator_kwargs
+    **estimator_kwargs,
 ):
     estimates = []
     exacts = []
@@ -32,3 +32,29 @@ def explained_variance(
     )
     ev_std = btstrap_evs.std()
     return ev, ev_std
+
+
+def linear_regression(
+    n,
+    features,
+    *,
+    include_constant=False,
+    sampler=random_complex_double_wishart,
+    n_tries=1000,
+    progress_bar=True,
+):
+    if include_constant:
+        features.append(lambda covariance: 1.0)
+    X = []
+    y = []
+    for _ in tqdm(range(n_tries), disable=not progress_bar):
+        covariance = sampler(n)
+        X.append([feature(covariance) for feature in features])
+        y.append([hafnian(covariance, method="recursive")])
+    X = np.array(X)
+    y = np.array(y)
+    inv = np.linalg.pinv if n == 1 else np.linalg.inv
+    beta = inv(X.transpose() @ X) @ (X.transpose() @ y)
+    corr = (((y.transpose() @ (X @ beta)) / (y.transpose() @ y)) ** 0.5).item()
+    ev = corr**2
+    return beta.flatten().tolist(), ev
