@@ -54,12 +54,14 @@ def linear_regression(
     X = np.array(X)
     y = np.array(y)
     inv = np.linalg.pinv if n == 1 else np.linalg.inv
-    beta = inv(X.transpose() @ X) @ (X.transpose() @ y)
+    XtXinv = inv(X.transpose() @ X)
+    beta = XtXinv @ (X.transpose() @ y)
     beta_std = (
-        np.diag(inv(X.transpose() @ X))
-        * (y.transpose() @ y - y.transpose() @ (X @ beta))
-        / n_tries
+        np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ (X @ beta)) / n_tries
     ) ** 0.5
-    corr = (((y.transpose() @ (X @ beta)) / (y.transpose() @ y)) ** 0.5).item()
-    ev = corr**2
-    return beta.flatten().tolist(), beta_std.flatten().tolist(), ev
+    P = X @ XtXinv @ X.transpose()
+    L = np.eye(n_tries)
+    if include_constant:
+        L -= np.ones((n_tries, n_tries)) / n_tries
+    rsquared = (y.transpose() @ P.transpose()) @ L @ (P @ y) / (y.transpose() @ L @ y)
+    return beta.flatten().tolist(), beta_std.flatten().tolist(), rsquared.item()
