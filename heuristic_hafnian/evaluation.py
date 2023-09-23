@@ -56,12 +56,12 @@ def linear_regression(
     inv = np.linalg.pinv if n == 1 else np.linalg.inv
     XtXinv = inv(X.transpose() @ X)
     beta = XtXinv @ (X.transpose() @ y)
+    yhat = X @ beta
     beta_std = (
-        np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ (X @ beta)) / n_tries
+        np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ yhat) / n_tries
     ) ** 0.5
-    P = X @ XtXinv @ X.transpose()
-    L = np.eye(n_tries)
     if include_constant:
-        L -= np.ones((n_tries, n_tries)) / n_tries
-    rsquared = (y.transpose() @ P.transpose()) @ L @ (P @ y) / (y.transpose() @ L @ y)
+        rsquared = ((yhat - y.mean()) ** 2).sum() / ((y - y.mean()) ** 2).sum()
+    else:
+        rsquared = (yhat.transpose() @ yhat) / (y.transpose() @ y)
     return beta.flatten().tolist(), beta_std.flatten().tolist(), rsquared.item()
