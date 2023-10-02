@@ -4,7 +4,53 @@ import warnings
 import numpy as np
 
 
-def random_symmetric(p):
+def random_real(p):
+    """
+    Random real matrix with i.i.d. standard
+    normal entries.
+    """
+    return np.random.randn(p, p)
+
+
+random_sign_states = {}
+
+
+def random_sign(p, *, zero_one=False, without_replacement=False):
+    """
+    Random real matrix with i.i.d. uniform +/-1
+    entries, or 0,1 entries if zero_one=True is
+    passed.
+
+    If without_replacement=True is passed,
+    statefully returns all such matrices in
+    some order.
+    """
+    num_entries = p**2
+    if without_replacement:
+        if 2**num_entries > int(1e8):
+            warnings.warn(f"Initializing state of size {2**num_entries}")
+        key = (int(p), bool(zero_one))
+        state = random_sign_symmetric_states.get(key)
+        if not state:
+            state = itertools.product(*(range(2),) * num_entries)
+            state = list(map(np.array, state))
+            np.random.shuffle(state)
+            random_sign_symmetric_states[key] = state
+        vec = state.pop()
+    else:
+        vec = np.random.randint(0, 2, size=num_entries)
+    if not zero_one:
+        vec = vec * 2 - 1
+    vec = vec.astype(float)
+    mat = vec.reshape(p, p)
+    return mat
+
+
+def random_01(p, **kwargs):
+    return random_sign(p, zero_one=True, **kwargs)
+
+
+def random_real_symmetric(p):
     """
     Random real symmetric matrix with i.i.d.
     standard normal off-diagonal entries.
@@ -17,10 +63,13 @@ def random_symmetric(p):
 random_sign_symmetric_states = {}
 
 
-def random_sign_symmetric(p, *, constant_diagonal=False, without_replacement=False):
+def random_sign_symmetric(
+    p, *, zero_one=False, constant_diagonal=False, without_replacement=False
+):
     """
     Random real symmetric matrix with i.i.d.
-    uniform +/-1 entries, or with ones on the
+    uniform +/-1 entries, or 0,1 entries if
+    zero_one=True is passed, or with ones on the
     diagonal if constant_diagonal=True is passed.
 
     If without_replacement=True is passed,
@@ -31,7 +80,7 @@ def random_sign_symmetric(p, *, constant_diagonal=False, without_replacement=Fal
     if without_replacement:
         if 2**num_entries > int(1e8):
             warnings.warn(f"Initializing state of size {2**num_entries}")
-        key = (int(p), bool(constant_diagonal))
+        key = (int(p), bool(zero_one), bool(constant_diagonal))
         state = random_sign_symmetric_states.get(key)
         if not state:
             state = itertools.product(*(range(2),) * num_entries)
@@ -41,12 +90,18 @@ def random_sign_symmetric(p, *, constant_diagonal=False, without_replacement=Fal
         vec = state.pop()
     else:
         vec = np.random.randint(0, 2, size=num_entries)
-    vec = (vec * 2 - 1).astype(float)
+    if not zero_one:
+        vec = vec * 2 - 1
+    vec = vec.astype(float)
     mat = np.ones((p, p))
     rows, cols = np.triu_indices(p, k=(1 if constant_diagonal else 0))
     mat[rows, cols] = vec
     mat[cols, rows] = vec
     return mat
+
+
+def random_01_symmetric(p, **kwargs):
+    return random_sign_symmetric(p, zero_one=True, **kwargs)
 
 
 def random_complex_symmetric(p):
@@ -102,16 +157,6 @@ def random_complex_wishart(p, *, cov=None, dof=None):
     real_samples = np.random.multivariate_normal(np.zeros(2 * p), real_cov, size=dof)
     samples = real_samples[:, :p] + real_samples[:, p:] * 1j
     return samples.transpose() @ samples.conjugate()
-
-
-def zero_block_diag(mat):
-    """
-    Returns the block matrix ((0 mat) (mat^T 0)),
-    whose hafnian is the permanent of mat.
-    """
-    return np.block(
-        [[np.zeros(mat.shape), mat], [mat.transpose(), np.zeros(mat.shape)]]
-    )
 
 
 def random_complex_double_wishart(p, *, cov=None, rel=None, dof=None):

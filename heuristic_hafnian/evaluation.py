@@ -1,15 +1,24 @@
+from typing import List, Optional
+
 import numpy as np
-from thewalrus import hafnian
+import typer
+from thewalrus import hafnian, perm
 from tqdm import tqdm
 
-from .wishart import random_complex_double_wishart
+from . import estimates, sampling
+
+targets = {
+    "hafnian": lambda mat: hafnian(mat, method="recursive"),
+    "permanent": perm,
+}
 
 
 def explained_variance(
     n,
     estimator,
     *,
-    sampler=random_complex_double_wishart,
+    sampler=sampling.random_complex_double_wishart,
+    target="hafnian",
     n_tries=1000,
     n_resamples=10000,
     progress_bar=True,
@@ -18,9 +27,9 @@ def explained_variance(
     estimates = []
     exacts = []
     for _ in tqdm(range(n_tries), disable=not progress_bar):
-        covariance = sampler(n)
-        estimates.append(estimator(covariance, **estimator_kwargs))
-        exacts.append(hafnian(covariance, method="recursive"))
+        mat = sampler(n)
+        estimates.append(estimator(mat, **estimator_kwargs))
+        exacts.append(targets[target](mat))
     estimates = np.array(estimates)
     exacts = np.array(exacts)
     ev = 1 - (np.abs(exacts - estimates) ** 2).mean() / exacts.var()
@@ -39,18 +48,19 @@ def linear_regression(
     features,
     *,
     include_constant=False,
-    sampler=random_complex_double_wishart,
+    sampler=sampling.random_complex_double_wishart,
+    target="hafnian",
     n_tries=1000,
     progress_bar=True,
 ):
     if include_constant:
-        features.append(lambda covariance: 1.0)
+        features = features + [lambda mat: 1.0]
     X = []
     y = []
     for _ in tqdm(range(n_tries), disable=not progress_bar):
-        covariance = sampler(n)
-        X.append([feature(covariance) for feature in features])
-        y.append([hafnian(covariance, method="recursive")])
+        mat = sampler(n)
+        X.append([feature(mat) for feature in features])
+        y.append([targets[target](mat, method="recursive")])
     X = np.array(X)
     y = np.array(y)
     inv = np.linalg.pinv if n == 1 else np.linalg.inv
@@ -58,10 +68,61 @@ def linear_regression(
     beta = XtXinv @ (X.transpose() @ y)
     yhat = X @ beta
     beta_std = (
-        np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ yhat) / n_tries
-    ) ** 0.5
+        np.maximum(
+            0, np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ yhat) / n_tries
+        )
+        ** 0.5
+    )
     if include_constant:
         rsquared = ((yhat - y.mean()) ** 2).sum() / ((y - y.mean()) ** 2).sum()
     else:
         rsquared = (yhat.transpose() @ yhat) / (y.transpose() @ y)
     return beta.flatten().tolist(), beta_std.flatten().tolist(), rsquared.item()
+
+
+def main(
+    max_n: int = 20,
+    features: List[str] = ["uniq"],
+    include_constant: bool = True,
+    sampler: str = "01",
+    target: str = "permanent",
+    n_tries: Optional[int] = None,
+    progress_bar: bool = False,
+):
+    suffix = "_symmetric" if target == "hafnian" else ""
+    if sampler not in ["sign" + suffix, "01" + suffix]:
+        assert n_tries is not None
+
+    feature_strs = features
+    sampler_str = sampler
+    n_tries_or_none = n_tries
+    features = [estimates.__dict__["est_" + s] for s in feature_strs]
+    sampler = sampling.__dict__["random_" + sampler_str]
+
+    sampler_kwargs = {}
+    if n_tries_or_none is None:
+        sampler_kwargs["without_replacement"] = True
+        if target == "hafnian":
+            sampler_kwargs["constant_diagonal"] = True
+
+    for n in range(1, max_n + 1):
+        if n_tries_or_none is None:
+            n_tries = 2 ** (n**2)
+            if target == "hafnian":
+                n_tries = 2 ** ((n * (n - 1)) // 2)
+        else:
+            n_tries = n_tries_or_none
+        beta, beta_std, rsquared = linear_regression(
+            n,
+            features=features,
+            include_constant=include_constant,
+            sampler=lambda n: sampler(n, **sampler_kwargs),
+            target=target,
+            n_tries=n_tries,
+            progress_bar=progress_bar,
+        )
+        print(f"{n=}: {beta=}, {beta_std=}, {rsquared=}")
+
+
+if __name__ == "__main__":
+    typer.run(main)

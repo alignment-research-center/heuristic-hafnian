@@ -19,4 +19,4 @@ Example:
 32274.905033773324
 ```
 
-Use the `evaluation` module to calculate the explained variance and OLS regression coefficients of different estimators over different distributions.
+Calculate OLS regression coefficients of different estimators over different distributions using: `python -m heuristic_hafnian.evaluation`
