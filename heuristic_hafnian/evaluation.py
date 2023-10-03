@@ -1,3 +1,4 @@
+import ast
 from typing import List, Optional
 
 import numpy as np
@@ -5,7 +6,7 @@ import typer
 from thewalrus import hafnian, perm
 from tqdm import tqdm
 
-from . import estimates, sampling
+from . import estimates, propagation, sampling
 
 targets = {
     "hafnian": lambda mat: hafnian(mat, method="recursive"),
@@ -60,7 +61,7 @@ def linear_regression(
     for _ in tqdm(range(n_tries), disable=not progress_bar):
         mat = sampler(n)
         X.append([feature(mat) for feature in features])
-        y.append([targets[target](mat, method="recursive")])
+        y.append([targets[target](mat)])
     X = np.array(X)
     y = np.array(y)
     inv = np.linalg.pinv if n == 1 else np.linalg.inv
@@ -80,7 +81,26 @@ def linear_regression(
     return beta.flatten().tolist(), beta_std.flatten().tolist(), rsquared.item()
 
 
+def hafnian_estimator(kwargs_str):
+    try:
+        kwargs = ast.literal_eval("{" + kwargs_str + "}")
+    except Exception as exn:
+        raise ValueError(f"Invalid kwargs string: {kwargs_str}") from exn
+    impute = kwargs.pop("impute", False)
+
+    def estimator(mat):
+        propagation_fn = (
+            propagation.cumulant_propagation_with_imputation
+            if impute
+            else propagation.cumulant_propagation
+        )
+        return propagation_fn(mat, **kwargs)
+
+    return estimator
+
+
 def main(
+    min_n: int = 1,
     max_n: int = 20,
     features: List[str] = ["uniq"],
     include_constant: bool = True,
@@ -96,7 +116,10 @@ def main(
     feature_strs = features
     sampler_str = sampler
     n_tries_or_none = n_tries
-    features = [estimates.__dict__["est_" + s] for s in feature_strs]
+    if target == "permanent":
+        features = [estimates.__dict__["est_" + s] for s in feature_strs]
+    else:
+        features = [hafnian_estimator(s) for s in feature_strs]
     sampler = sampling.__dict__["random_" + sampler_str]
 
     sampler_kwargs = {}
@@ -105,7 +128,7 @@ def main(
         if target == "hafnian":
             sampler_kwargs["constant_diagonal"] = True
 
-    for n in range(1, max_n + 1):
+    for n in range(min_n, max_n + 1):
         if n_tries_or_none is None:
             n_tries = 2 ** (n**2)
             if target == "hafnian":
