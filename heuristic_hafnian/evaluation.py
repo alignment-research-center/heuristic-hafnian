@@ -1,4 +1,5 @@
 import ast
+import warnings
 from typing import List, Optional
 
 import numpy as np
@@ -64,8 +65,7 @@ def linear_regression(
         y.append([targets[target](mat)])
     X = np.array(X)
     y = np.array(y)
-    inv = np.linalg.pinv if n == 1 else np.linalg.inv
-    XtXinv = inv(X.transpose() @ X)
+    XtXinv = invert(X.transpose() @ X)
     beta = XtXinv @ (X.transpose() @ y)
     yhat = X @ beta
     beta_std = (
@@ -99,6 +99,14 @@ def hafnian_estimator(kwargs_str):
     return estimator
 
 
+def invert(mat):
+    try:
+        return np.linalg.inv(mat)
+    except np.linalg.LinAlgError:
+        warnings.warn("Singular matrix, using pseudoinverse")
+        return np.linalg.pinv(mat)
+
+
 def main(
     min_n: int = 1,
     max_n: int = 20,
@@ -128,6 +136,7 @@ def main(
         if target == "hafnian":
             sampler_kwargs["constant_diagonal"] = True
 
+    warnings.simplefilter("always")
     for n in range(min_n, max_n + 1):
         if n_tries_or_none is None:
             n_tries = 2 ** (n**2)
