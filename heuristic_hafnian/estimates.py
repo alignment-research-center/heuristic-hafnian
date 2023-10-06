@@ -91,4 +91,4 @@ def zero_block_diag(mat):
 
 def est_cov(mat):
     covariance = zero_block_diag(mat)
-    return cumulant_propagation(covariance, order=3)
+    return cumulant_propagation(covariance, order=2)

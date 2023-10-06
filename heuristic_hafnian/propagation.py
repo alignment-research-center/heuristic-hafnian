@@ -1,3 +1,7 @@
+"""
+Cumulant propagation for the hafnian.
+"""
+
 import functools
 import itertools
 from collections.abc import Iterable
