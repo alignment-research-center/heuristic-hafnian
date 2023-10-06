@@ -12,9 +12,15 @@ from .estimates import (
 )
 from .pairings import (
     all_pairings,
-    elementary_matrix,
+    indicator_of_pairing,
     product_over_pairing,
     random_pairing,
+)
+from .permutations import (
+    all_permutations,
+    indicator_of_permutation,
+    product_over_permutation,
+    random_permutation,
 )
 from .propagation import cumulant_propagation, cumulant_propagation_with_imputation
 from .sampling import (

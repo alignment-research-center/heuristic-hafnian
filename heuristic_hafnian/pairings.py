@@ -54,7 +54,7 @@ def product_over_pairing(matrix, pairing):
     return result
 
 
-def elementary_matrix(pairing):
+def indicator_of_pairing(pairing):
     """
     Given a pairing, returns the symmetric matrix with whose (i, j)th
     entry is 1 if (i, j) or (j, i) is in the pairing and 0 otherwise.
