@@ -1,22 +1,51 @@
-# Heuristic hafnian approximation
+# Heuristic hafnian estimation
 
-Utilities for estimating hafnians of matrices using cumulant propagation and related algorithms.
+Utilities for calculating heuristic estimates of permanents and hafnians.
 
-Example:
+Estimators:
+
+- Estimators for the permanent only include `est_row`, `est_col`, `est_sum`, `est_uniq` and `product_over_permutation`.
+- Estimators for the hafnian include `cumulant_propagation`, `cumulant_propagation_with_imputation` and `product_over_pairing`.
+
+Sampling functions:
+
+- Functions for sampling matrices suitable for the permanent include `random_real`, `random_sign`, `random_01` and `random_wishart`.
+- Functions for sampling matrices suitable for the hafnian include `random_real_symmetric`, `random_sign_symmetric`, `random_01_symmetric` and `random_double_wishart`.
+
+Example for the permanent:
+
+```
+>>> from heuristic_hafnian import est_row, est_sum, random_wishart, zero_block_diag, cumulant_propagation
+>>> from thewalrus import perm
+>>> mat = random_wishart(5)
+>>> est_row(mat)   # n!/n^n times product of row sums
+10251.233861678926
+>>> est_sum(mat)   # n!/n^(2n) times sum of entries to the power n
+11781.581263992726
+>>> cumulant_propagation(zero_block_diag(mat))  # Exact permanent using cumulant propagation
+32871.99246021791
+>>> perm(mat)  # Faster exact permanent
+32871.9924602179
+```
+
+Example for the hafnian:
 
 ```
 >>> from heuristic_hafnian import cumulant_propagation, cumulant_propagation_with_imputation, random_double_wishart
+>>> from thewalrus import hafnian
 >>> cov = random_double_wishart(10)
 >>> cumulant_propagation(cov, order=1)  # Mean propagation estimate
 0
 >>> cumulant_propagation(cov, order=2)  # Covariance propagation estimate
 10856.32167102877
->>> cumulant_propagation(cov, order=3)  # Third cumulant propagation estimate
+>>> cumulant_propagation(cov, order=3)  # 3rd-order cumulant propagation estimate
 11414.589102340478
->>> cumulant_propagation_with_imputation(cov, order=3)  # Third cumulant propagation with imputation estimate
+>>> cumulant_propagation_with_imputation(cov, order=3)  # 3rd-order cumulant propagation with imputation estimate
 12260.347921286422
->>> cumulant_propagation(cov)  # Exact hafnian calculation
+>>> cumulant_propagation(cov)  # Exact hafnian using cumulant propagation
+32274.905033773324
+>>> hafnian(cov, method="recursive")  # Faster exact hafnian
 32274.905033773324
 ```
 
-Calculate OLS regression coefficients of different estimators over different distributions using: `python -m heuristic_hafnian.evaluation`
+OLS regression coefficients of different estimators over different distributions can be calculated using: `python -m heuristic_hafnian.evaluation`
