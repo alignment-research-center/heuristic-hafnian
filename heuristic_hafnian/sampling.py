@@ -4,12 +4,28 @@ import warnings
 import numpy as np
 
 
-def random_real(p):
+def random_normal(p):
     """
     Random real matrix with i.i.d. standard
     normal entries.
     """
     return np.random.randn(p, p)
+
+
+def random_exponential(p):
+    """
+    Random real matrix with i.i.d. standard
+    exponential entries.
+    """
+    return np.random.exponential(size=(p, p))
+
+
+def random_poisson(p):
+    """
+    Random real matrix with i.i.d. standard
+    Poisson entries.
+    """
+    return np.random.poisson(size=(p, p)).astype(float)
 
 
 random_sign_states = {}
@@ -50,7 +66,7 @@ def random_01(p, **kwargs):
     return random_sign(p, zero_one=True, **kwargs)
 
 
-def random_real_symmetric(p):
+def random_normal_symmetric(p):
     """
     Random real symmetric matrix with i.i.d.
     standard normal off-diagonal entries.
@@ -58,6 +74,34 @@ def random_real_symmetric(p):
     mat = np.random.randn(p, p)
     mat = (mat + mat.transpose()) / 2**0.5
     return mat
+
+
+def vec_to_symmetric(vec, p, *, default=1.0):
+    mat = np.ones((p, p)) * default
+    k = 1 if vec.size * 2 < p**2 else 0
+    assert vec.size == (p * (p + (1 if k == 0 else -1))) // 2
+    rows, cols = np.triu_indices(p, k=k)
+    mat[rows, cols] = vec
+    mat[cols, rows] = vec
+    return mat
+
+
+def random_exponential_symmetric(p):
+    """
+    Random real symmetric matrix with i.i.d.
+    standard exponential off-diagonal entries.
+    """
+    vec = np.random.exponential(size=(p * (p + 1)) // 2)
+    return vec_to_symmetric(vec, p)
+
+
+def random_poisson_symmetric(p):
+    """
+    Random real symmetric matrix with i.i.d.
+    standard Poisson off-diagonal entries.
+    """
+    vec = np.random.poisson(size=(p * (p + 1)) // 2).astype(float)
+    return vec_to_symmetric(vec, p)
 
 
 random_sign_symmetric_states = {}
@@ -93,18 +137,14 @@ def random_sign_symmetric(
     if not zero_one:
         vec = vec * 2 - 1
     vec = vec.astype(float)
-    mat = np.ones((p, p))
-    rows, cols = np.triu_indices(p, k=(1 if constant_diagonal else 0))
-    mat[rows, cols] = vec
-    mat[cols, rows] = vec
-    return mat
+    return vec_to_symmetric(vec, p)
 
 
 def random_01_symmetric(p, **kwargs):
     return random_sign_symmetric(p, zero_one=True, **kwargs)
 
 
-def random_complex_symmetric(p):
+def random_complex_normal_symmetric(p):
     """
     Random complex symmetric matrix with i.i.d.
     standard complex normal off-diagonal entries.

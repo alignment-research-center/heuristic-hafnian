@@ -9,8 +9,8 @@ Estimators:
 
 Sampling functions:
 
-- Functions for sampling matrices suitable for the permanent include `random_real`, `random_sign`, `random_01` and `random_wishart`.
-- Functions for sampling matrices suitable for the hafnian include `random_real_symmetric`, `random_sign_symmetric`, `random_01_symmetric` and `random_double_wishart`.
+- Functions for sampling matrices suitable for the permanent include `random_normal`, `random_sign`, `random_01` and `random_wishart`.
+- Functions for sampling matrices suitable for the hafnian include `random_normal_symmetric`, `random_sign_symmetric`, `random_01_symmetric` and `random_double_wishart`.
 
 Example for the permanent:
 
