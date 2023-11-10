@@ -244,13 +244,8 @@ def random_double_wishart(p, *, cov=None, dof=None):
     with relation matrix zero.
     """
     assert p % 2 == 0
-    if cov is None:
-        cov = np.eye(p // 2)
-    if dof is None:
-        dof = p // 2
-    samples = np.random.multivariate_normal(np.zeros(p // 2), cov / 2, size=dof * 2)
-    mat1 = samples[:dof, :].transpose() @ samples[:dof, :]
-    mat2 = samples[dof:, :].transpose() @ samples[dof:, :]
-    psd = mat1 + mat2
-    sym = mat1 - mat2
+    mat1 = random_wishart(p // 2, cov=cov, dof=dof)
+    mat2 = random_wishart(p // 2, cov=cov, dof=dof)
+    psd = (mat1 + mat2) / 2
+    sym = (mat1 - mat2) / 2
     return np.block([[sym, psd], [psd, sym]])
