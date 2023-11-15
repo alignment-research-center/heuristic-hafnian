@@ -111,6 +111,7 @@ def main(
     min_n: int = 1,
     max_n: int = 20,
     features: List[str] = ["uniq"],
+    regress: bool = True,
     include_constant: bool = True,
     sampler: str = "01",
     dof: Optional[int] = None,
@@ -118,6 +119,8 @@ def main(
     n_tries: Optional[int] = None,
     progress_bar: bool = False,
 ):
+    if not regress:
+        assert len(features) == 1
     suffix = "_symmetric" if target == "hafnian" else ""
     if sampler not in ["sign" + suffix, "01" + suffix]:
         assert n_tries is not None
@@ -149,16 +152,27 @@ def main(
                 n_tries = 2 ** ((n * (n - 1)) // 2)
         else:
             n_tries = n_tries_or_none
-        beta, beta_std, rsquared = linear_regression(
-            n,
-            features=features,
-            include_constant=include_constant,
-            sampler=lambda n: sampler(n, **sampler_kwargs),
-            target=target,
-            n_tries=n_tries,
-            progress_bar=progress_bar,
-        )
-        print(f"{n=}: {beta=}, {beta_std=}, {rsquared=}")
+        if regress:
+            beta, beta_std, rsquared = linear_regression(
+                n,
+                features=features,
+                include_constant=include_constant,
+                sampler=lambda n: sampler(n, **sampler_kwargs),
+                target=target,
+                n_tries=n_tries,
+                progress_bar=progress_bar,
+            )
+            print(f"{n=}: {beta=}, {beta_std=}, {rsquared=}")
+        else:
+            ev, ev_std = explained_variance(
+                n,
+                features[0],
+                sampler=lambda n: sampler(n, **sampler_kwargs),
+                target=target,
+                n_tries=n_tries,
+                progress_bar=progress_bar,
+            )
+            print(f"{n=}: {ev=}, {ev_std=}")
 
 
 if __name__ == "__main__":
