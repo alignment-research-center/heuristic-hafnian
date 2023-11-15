@@ -15,44 +15,39 @@ targets = {
 }
 
 
-def explained_variance(
-    n,
-    estimator,
-    *,
-    sampler=sampling.random_complex_double_wishart,
-    target="hafnian",
-    n_tries=1000,
-    n_resamples=10000,
-    progress_bar=True,
-    **estimator_kwargs,
-):
-    estimates = []
-    exacts = []
-    for _ in tqdm(range(n_tries), disable=not progress_bar):
-        mat = sampler(n)
-        estimates.append(estimator(mat, **estimator_kwargs))
-        exacts.append(targets[target](mat))
-    estimates = np.array(estimates)
-    exacts = np.array(exacts)
-    ev = 1 - (np.abs(exacts - estimates) ** 2).mean() / exacts.var()
-    btstrap_indices = np.random.randint(0, n_tries, size=(n_resamples, n_tries))
-    btstrap_estimates = estimates[btstrap_indices]
-    btstrap_exacts = exacts[btstrap_indices]
-    btstrap_evs = 1 - (np.abs(btstrap_exacts - btstrap_estimates) ** 2).mean(1) / (
-        btstrap_exacts.var(1)
-    )
-    ev_std = btstrap_evs.std()
-    return ev, ev_std
+def invert(mat):
+    try:
+        return np.linalg.inv(mat)
+    except np.linalg.LinAlgError:
+        warnings.warn("Singular matrix, using pseudoinverse")
+        return np.linalg.pinv(mat)
+
+
+def regression_stats(X, y, *, fit_coeffs=True):
+    if fit_coeffs:
+        XtXinv = invert(X.swapaxes(-2, -1) @ X)
+        beta = XtXinv @ (X.swapaxes(-2, -1) @ y)
+        eps = y - X @ beta
+        beta_var = np.diagonal(XtXinv, axis1=-2, axis2=-1) * (eps**2).mean(-2)
+        beta_std = np.maximum(beta_var, 0) ** 0.5
+    else:
+        beta = np.ones(X.shape[:-2] + (X.shape[-1], 1))
+        eps = y - X @ beta
+        beta_std = np.zeros(X.shape[:-2] + (X.shape[-1],))
+    r_squared = 1 - (eps**2).mean(-2) / y.var(-2)
+    return beta, beta_std, r_squared
 
 
 def linear_regression(
     n,
     features,
     *,
+    fit_coeffs=True,
     include_constant=False,
     sampler=sampling.random_complex_double_wishart,
     target="hafnian",
     n_tries=1000,
+    n_resamples=10000,
     progress_bar=True,
 ):
     if include_constant:
@@ -65,20 +60,18 @@ def linear_regression(
         y.append([targets[target](mat)])
     X = np.array(X)
     y = np.array(y)
-    XtXinv = invert(X.transpose() @ X)
-    beta = XtXinv @ (X.transpose() @ y)
-    yhat = X @ beta
-    beta_std = (
-        np.maximum(
-            0, np.diag(XtXinv) * (y.transpose() @ y - y.transpose() @ yhat) / n_tries
-        )
-        ** 0.5
+    beta, beta_std, r_squared = regression_stats(X, y, fit_coeffs=fit_coeffs)
+    btstrap_indices = np.random.randint(0, n_tries, size=(n_resamples, n_tries))
+    _, _, btstrap_r_squared = regression_stats(
+        X[btstrap_indices], y[btstrap_indices], fit_coeffs=fit_coeffs
     )
-    if include_constant:
-        rsquared = ((yhat - y.mean()) ** 2).sum() / ((y - y.mean()) ** 2).sum()
-    else:
-        rsquared = (yhat.transpose() @ yhat) / (y.transpose() @ y)
-    return beta.flatten().tolist(), beta_std.flatten().tolist(), rsquared.item()
+    r_squared_std = btstrap_r_squared.std()
+    return (
+        beta.flatten().tolist(),
+        beta_std.flatten().tolist(),
+        r_squared.item(),
+        r_squared_std.item(),
+    )
 
 
 def hafnian_estimator(kwargs_str):
@@ -99,28 +92,19 @@ def hafnian_estimator(kwargs_str):
     return estimator
 
 
-def invert(mat):
-    try:
-        return np.linalg.inv(mat)
-    except np.linalg.LinAlgError:
-        warnings.warn("Singular matrix, using pseudoinverse")
-        return np.linalg.pinv(mat)
-
-
 def main(
     min_n: int = 1,
     max_n: int = 20,
     features: List[str] = ["uniq"],
-    regress: bool = True,
+    fit_coeffs: bool = True,
     include_constant: bool = True,
     sampler: str = "01",
     dof: Optional[int] = None,
     target: str = "permanent",
     n_tries: Optional[int] = None,
+    n_resamples: int = 10000,
     progress_bar: bool = False,
 ):
-    if not regress:
-        assert len(features) == 1
     suffix = "_symmetric" if target == "hafnian" else ""
     if sampler not in ["sign" + suffix, "01" + suffix]:
         assert n_tries is not None
@@ -152,27 +136,18 @@ def main(
                 n_tries = 2 ** ((n * (n - 1)) // 2)
         else:
             n_tries = n_tries_or_none
-        if regress:
-            beta, beta_std, rsquared = linear_regression(
-                n,
-                features=features,
-                include_constant=include_constant,
-                sampler=lambda n: sampler(n, **sampler_kwargs),
-                target=target,
-                n_tries=n_tries,
-                progress_bar=progress_bar,
-            )
-            print(f"{n=}: {beta=}, {beta_std=}, {rsquared=}")
-        else:
-            ev, ev_std = explained_variance(
-                n,
-                features[0],
-                sampler=lambda n: sampler(n, **sampler_kwargs),
-                target=target,
-                n_tries=n_tries,
-                progress_bar=progress_bar,
-            )
-            print(f"{n=}: {ev=}, {ev_std=}")
+        beta, beta_std, r_squared, r_squared_std = linear_regression(
+            n,
+            features=features,
+            fit_coeffs=fit_coeffs,
+            include_constant=include_constant,
+            sampler=lambda n: sampler(n, **sampler_kwargs),
+            target=target,
+            n_tries=n_tries,
+            n_resamples=n_resamples,
+            progress_bar=progress_bar,
+        )
+        print(f"{n=}: {beta=}, {beta_std=}, {r_squared=}, {r_squared_std=}")
 
 
 if __name__ == "__main__":
