@@ -113,6 +113,7 @@ def main(
     features: List[str] = ["uniq"],
     include_constant: bool = True,
     sampler: str = "01",
+    dof: Optional[int] = None,
     target: str = "permanent",
     n_tries: Optional[int] = None,
     progress_bar: bool = False,
@@ -120,6 +121,8 @@ def main(
     suffix = "_symmetric" if target == "hafnian" else ""
     if sampler not in ["sign" + suffix, "01" + suffix]:
         assert n_tries is not None
+    if "wishart" not in sampler:
+        assert dof is None
 
     feature_strs = features
     sampler_str = sampler
@@ -135,6 +138,8 @@ def main(
         sampler_kwargs["without_replacement"] = True
         if target == "hafnian":
             sampler_kwargs["constant_diagonal"] = True
+    if dof is not None:
+        sampler_kwargs["dof"] = dof
 
     warnings.simplefilter("always")
     for n in range(min_n, max_n + 1):
