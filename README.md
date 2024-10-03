@@ -1,6 +1,8 @@
 # Heuristic hafnian estimation
 
-Utilities for calculating heuristic estimates of permanents and hafnians.
+Code related to the paper: [**Towards a Law of Iterated Expectations for Heuristic Estimators**](https://arxiv.org/abs/2410.01290)
+
+This repo contains utilities for calculating heuristic estimates of permanents and hafnians, as well as a script for estimating OLS regression coefficients over different distributions.
 
 Estimators:
 
@@ -48,4 +50,10 @@ Example for the hafnian:
 32274.905033773324
 ```
 
-OLS regression coefficients of different estimators over different distributions can be calculated using: `python -m heuristic_hafnian.evaluation`
+OLS regression coefficients of different estimators over different distributions can be calculated using the `evaluation` module. For example, to estimate joint OLS regression coefficients for the row sum, column sum and matrix sum estimators for the permanent over matrices with independent standard Gaussian entries, run:
+
+```
+python -m heuristic_hafnian.evaluation --features row --features col --features sum --no-include-constant --sampler normal --target permanent --n-tries 10000
+```
+
+See the docstring in that module for further usage instructions.

@@ -105,6 +105,28 @@ def main(
     n_resamples: int = 10000,
     progress_bar: bool = False,
 ):
+    """
+    Calculate and print OLS regression coefficients and statistics for a
+    collection of heuristic estimators for the permanent or hafnian.
+
+    Arguments:
+    - min_n: minimum matrix size
+    - max_n: maximum matrix size
+    - features: list of either names of estimators from the `estimates` module
+        for the permanent, or cumulant propagation kwargs for the hafnian
+    - fit_coeffs: whether to do OLS regression, or to just print statistics
+        using coefficients of 1
+    - include_constant: whether to include a constant term in the regression
+    - sampler: name of distribution from the `sampling` module
+    - dof: degrees of freedom parameter, for a Wishart or double Wishart
+        distribution
+    - target: "permanent" or "hafnian"
+    - n_tries: number of samples used to perform OLS regression, or None to
+        sample every possible value, for a finite discrete distribution
+    - n_resamples: number of boostrap resamples for calculating the standard
+        error of R squared
+    - progress_bar: whether to enable a tqdm progress bar
+    """
     suffix = "_symmetric" if target == "hafnian" else ""
     if sampler not in ["sign" + suffix, "01" + suffix]:
         assert n_tries is not None
